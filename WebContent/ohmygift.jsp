@@ -65,6 +65,7 @@
             outline: 0;
             outline-style:none;
             outline-width:0;
+            text-decoration: :none;
          }
          .page1{
              margin-top: 0px;
@@ -284,12 +285,11 @@
 			},
 			{ scope:'friends_birthday,user_birthday,friends_about_me,publish_stream,friends_photos,user_likes,friends_likes,manage_pages,offline_access,read_insights'});	
 		  } else {
-	          console.log(response);
 	          FB.login(function(response) {
 				  if (response) {
-					  //history.go(0);
+					  history.go(0);
 				  } else {
-					  //history.go(0);
+					  history.go(0);
 				  }
 			},
 			{ scope:''});
@@ -378,36 +378,43 @@
 				    query: frientBirth_query
 				  },
 				  function(response) {
-					  $.each(response,function(i,n){
-						//alert('친구'+response[0].name +'의 생일은?' + response[0].birthday + "이미지 url : "+response[0].pic_small);
-						$('<li></li>')
-						.append('<img src="'+response[i].pic_small+'"'+'imgnum="'+ response[i].uid +'"'+' />')
-						.appendTo('#img_ul');
-	
-						var user = {};
-						user['uid'] = response[i].uid;
-						user['name'] = response[i].name;
-						user['birthday'] = response[i].birthday;
-						user['pic_small'] = response[i].pic_small;
-						friend_name_array.push(response[i].name);
-						friend_list_array.push(user);
-						friend_list_hash.put(response[i].uid,user);
-						friend_list_hash_byname.put(response[i].name,user);
-						
-	                    setEachFriendList(response[i].name);
-						
-						return i < response.length;
-					  });					
+					  setFriendListView(response);					
 					  /*친구목록 받아오기 완료*/
 					  setAutoComplete();
-                      //getActiveUser(data);
+                      getActiveUser(data);
                       setFriendListPageControl();
                       $.fancybox.hideActivity();
                       isLoading = false;
  				  }
 			);
 	    }
-	
+	    
+	    /* @친구 리스트를 만드는 함수 
+	     * @Param array 친구 list
+	     * @return void;
+	     */
+		function setFriendListView(response){
+			$.each(response,function(i,n){
+				$('<li></li>')
+				.append('<img src="'+response[i].pic_small+'"'+'imgnum="'+ response[i].uid +'"'+' />')
+				.appendTo('#img_ul');
+
+				var user = {};
+				user['uid'] = response[i].uid;
+				user['name'] = response[i].name;
+				user['birthday'] = response[i].birthday;
+				user['pic_small'] = response[i].pic_small;
+				friend_name_array.push(response[i].name);
+				friend_list_array.push(user);
+				friend_list_hash.put(response[i].uid,user);
+				friend_list_hash_byname.put(response[i].name,user);
+				
+                setEachFriendList(response[i].name);
+				
+				return i < response.length;
+			  });
+	     }
+	     
         
         function setEachFriendList(name){
             $('<li style="cursor:pointer; font-size:8px; width:150px;"></li>')
@@ -422,7 +429,6 @@
 			   selectedFriendUid = friend_list_array[click].uid;
 			   selectedFriendImg = friend_list_array[click].pic_small;
 			   selectedFriendBirthday = friend_list_array[click].birthday;
-               
 			   
                $('<img style="margin-left: 30px; width:35px; height:35px; float:left;"/>')
                .attr('src',friend_list_array[click].pic_small)
@@ -449,13 +455,13 @@
             $("input#fancy_friendlist_nameinput").autocomplete({
                 source: friend_name_array,
                 close: function(event, ui){ 
-                  
+                	
                 },
                 change: function(event, ui) {
-                   
+                	
                 },
-                focus: function(event, ui) { 
-                    
+                search: function(event, ui) { 
+                	
                 },
                 select: function(event, ui) { 
                     var namedata = ui.item.value;
@@ -464,18 +470,44 @@
                     .append('<h1 style="width:190px; margin:2px;">'+ namedata +'</h1>')
                     .appendTo('#fancy_friend_list');  
                     
-                    setSelectListner();
-					//setFriendListPageControl();
+                    setSelectedListner(namedata);
+                },
+                focus:function(event, ui) { 
+                	
                 }
             });
+            
+            $("input#fancy_friendlist_nameinput").focusout(function(){
+            	
+            });
+            
+            var input = document.getElementById("fancy_friendlist_nameinput");
+            input.oninput = function() {
+            	if(input.value == ""){
+            		$('#img_ul').text('');
+            		setFriendListView(friend_list_array);
+            	}
+            };
+
         };
-       
+        
+        function setSelectedListner(namedata){
+        	$("input#fancy_friendlist_nameinput").autocomplete('close');
+        	$('#friend_detail_view').text('');
+            $('<img style="margin-left: 30px; width:35px; height:35px; float:left;"/>')
+            .attr('src',friend_list_hash_byname.get(namedata).pic_small)
+            .appendTo('#friend_detail_view');
+
+            $('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;" id="selected_friendlist_name" >'+namedata+'</h1>')
+            .append('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;">'+friend_list_hash_byname.get(namedata).birthday+'<h1>')
+            .appendTo('#friend_detail_view');	
+        }
 		
-		
-        /*app 사용중인 내친구 가져오기*/
-        var activeFriendList;
+        /*
+         *@app 사용중인 내친구 가져오기
+         *@param String uids
+         */
 		function getActiveUser(data){ 
-         
 		    $.ajax({
 				type : 'POST',
 				url :'./ajax/member_show.jsp',
@@ -487,8 +519,8 @@
 					$li = $('<li></li>');
                     $.each(json,function(i){
                     	$li = $li
-                        .append('<a herf="./getrolling.roll?paper_id='+json[i].roll_id+'" >'+'<img src="'+ json[i].friend_image +'" />'+'</a>')
-                        .append('<h2 style="margin-left: 10px;">'+json[i].friend_name+"</h2>")
+                        .append('<a href="./getrolling.roll?paper_id='+json[i].roll_id+'" >'+'<img src="'+ json[i].friend_image +'" />'+'</a>')
+                        .append('<a href="./getrolling.roll?paper_id='+json[i].roll_id+'" >'+'<h2 style="margin-left: 10px;">'+json[i].friend_name+"</h2>"+'</a>')
                        	.append('<div class="clear_fix"></div>');
                     	if(json.length <= 3){
                     		if(i == json.length-1){

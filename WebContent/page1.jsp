@@ -90,7 +90,6 @@
                  	여러 마음이 모여 하나가 되는 선물
         	<br />
         	<br />
-            
         </p>   
     	<div class="btn_container">
    	        <a class="me_gift_btn" id="Forme_Btn">
