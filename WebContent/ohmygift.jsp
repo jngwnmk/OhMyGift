@@ -88,8 +88,9 @@
 		var selectedFriendUid="";
 		var selectedFriendImg="";
 		var selectedFriendBirthday="";
-        
+		var isLoading;
         $(document).ready(function(){
+        	console.log("document ready");
         	//나에게 선물 하기 버튼
         	$("#Forme_Btn").click(function(){
                 $('#page1').hide();
@@ -97,22 +98,7 @@
                 $('#page2').show('slow');
                 setPage2(myName,myUid,myImg,myBirthday,myUid);
             });
-            //친구에게 선물 하기 버튼
-            $("a#ForFriend_Btn").fancybox({
-                    'titleShow'  : false,
-                    'transitionIn'  : 'fade',
-                    'transitionOut' : 'none',
-                    'width' : '100%',
-                    'height' : '100%',
-                    'overlayShow'           : true,
-                    'onClosed'		: function() {
-                	    $("#fancybox-outer").css('background','white');
-                	},
-                    'onStart'		: function() {
-                        $("#fancybox-outer").css('width','440px');
-                        $('#fancybox-loading').css('top','35%');
-                	}
-            });
+            
             //친구 선택 버튼
             $('#friend_add_img_btn').click(function(){
                 setPage2(selectedFriendName,selectedFriendUid,selectedFriendImg,selectedFriendBirthday,myUid);
@@ -121,6 +107,15 @@
                 $('#page2').show('slow');
                 $('#page3').hide();
     		});
+            isLoading = true;
+            $("a#ForFriend_Btn").click(function(){
+            	if(isLoading){
+            		$('#fancybox-loading').css('top','310px');
+            		$.fancybox.showActivity();
+            		firstClick = false;
+            	}
+            	setFriendListPageControl();
+            });
     	});
 	  
         
@@ -221,7 +216,7 @@
 		  if (response.status === 'connected') {
 		    var uid = response.authResponse.userID;
 		    accessToken = response.authResponse.accessToken;
-		   	addFriendBirth();
+		    
             var frientBirth_query = "SELECT uid,name,birthday,pic_small FROM user WHERE uid=";
 			frientBirth_query += uid;
             FB.api(
@@ -252,7 +247,7 @@
         			});
  				  }
 			);
-            
+            addFriendBirth();
 		  } else if (response.status === 'not_authorized') {
 		    FB.login(function(response) {
 		    	var query = "SELECT uid,name,birthday,pic_small FROM user WHERE uid=";
@@ -322,29 +317,50 @@
 	   });
 	   
 	   /*
-	    * accessToken 을 받자마자 자신의 친구목록( 생일 ) 을 가져오는 함수.
-	    * friend_list 친구들 Array - { uid , name }
-	    */
-		var friend_list = new Array();
+	    * accessToken 을 받자마자 자신의 친구목록을 가져오는 함수.
+	    */	    
 	    function addFriendBirth(){
+	    	var friend_list = new Array();
+	    	var data;
 			var friends_url = "https://graph.facebook.com/me/friends?access_token="+accessToken+"&callback=?";
 			var params = { format :'json'};
 			$.getJSON(friends_url,params, function(json){
 				if(json.data){
 					$.each(json.data,function(i,n){
-						var item = json.data[i];
-						var user = {};
-						user['uid'] = item.id;
-						user['name'] = item.name;
-						friend_list.push(user);
-						getUserProfile(item.id);
+						var uid = json.data[i].id;
+						friend_list.push(uid);
+						
 						return i < json.data.length;
 					});
+					data = returnUids(friend_list);
+					getFriendInfo(data,friend_list.length);
 				}
 			});
 		}
-		/*
-		 * uid로 친구들 이름 생일 사진 가져오는 함수.
+	    /*
+	     * where in query 를 사용하기 위해 data 를 만드는 함수 
+	     * @param array 
+	     * @return string (uid1,uid2, ....)
+	     */
+	    function returnUids(a){
+	    	var data = "";
+            for(var i=0; i < a.length; i++){
+                var id = a[i];
+                if(i == a.length-1){
+                    data += id;
+                }
+                else{
+                    data += id +",";   
+                }
+            }; 
+            return data;
+	    }
+	    /*
+	     * 친구 정보들을 가져오는 함수
+	     * @param string (uids) , int length(친구의 숫자)
+	     * @return void
+	     */
+	    /*
 		 * friend_list_hash - HashMap 스타일 ex) friend_list_hash.getPos(0).name , friend_list_hash.get(uid).name
 		 * friend_list_array - Array 스타일 ex) friend_list_array[0].name
 		 */
@@ -352,69 +368,71 @@
 		var friend_list_hash_byname = new HashMap();
 		var friend_list_array = new Array();
         var friend_name_array = new Array();
-		function getUserProfile(uid){
-			this.uid = uid;
-			var frientBirth_query = "SELECT uid,name,birthday,pic_small FROM user WHERE uid=";
-			frientBirth_query += this.uid;
-			
-			FB.api(
+	    function getFriendInfo(data,friendNum){
+	    	var frientBirth_query = "SELECT uid,name,birthday,pic_small FROM user WHERE uid in (";
+			frientBirth_query += data;
+			frientBirth_query += ')'
+            FB.api(
 				  {
 				    method: 'fql.query',
 				    query: frientBirth_query
 				  },
 				  function(response) {
-				    //alert('친구'+response[0].name +'의 생일은?' + response[0].birthday + "이미지 url : "+response[0].pic_small);
-					$('<li></li>')
-					.append('<img src="'+response[0].pic_small+'"'+'imgnum="'+ response[0].uid +'"'+' />')
-					.appendTo('#img_ul');
-
-					var user = {};
-					user['uid'] = response[0].uid;
-					user['name'] = response[0].name;
-					user['birthday'] = response[0].birthday;
-					user['pic_small'] = response[0].pic_small;
-					friend_name_array.push(response[0].name);
-					friend_list_array.push(user);
-					friend_list_hash.put(response[0].uid,user);
-					friend_list_hash_byname.put(response[0].name,user);
-					
-                    
-                    setEachFriendList(response[0].name);
-                    
-					/*친구목록 받아오기 완료*/
-					if(friend_list_hash.size() == friend_list.length){
-                        
-                        setAutoComplete();
-                        getActiveUser();
-					}
-				  }
+					  $.each(response,function(i,n){
+						//alert('친구'+response[0].name +'의 생일은?' + response[0].birthday + "이미지 url : "+response[0].pic_small);
+						$('<li></li>')
+						.append('<img src="'+response[i].pic_small+'"'+'imgnum="'+ response[i].uid +'"'+' />')
+						.appendTo('#img_ul');
+	
+						var user = {};
+						user['uid'] = response[i].uid;
+						user['name'] = response[i].name;
+						user['birthday'] = response[i].birthday;
+						user['pic_small'] = response[i].pic_small;
+						friend_name_array.push(response[i].name);
+						friend_list_array.push(user);
+						friend_list_hash.put(response[i].uid,user);
+						friend_list_hash_byname.put(response[i].name,user);
+						
+	                    setEachFriendList(response[i].name);
+						
+						return i < response.length;
+					  });					
+					  /*친구목록 받아오기 완료*/
+					  setAutoComplete();
+                      //getActiveUser(data);
+                      setFriendListPageControl();
+                      $.fancybox.hideActivity();
+                      isLoading = false;
+ 				  }
 			);
-		}
+	    }
+	
         
         function setEachFriendList(name){
             $('<li style="cursor:pointer; font-size:8px; width:150px;"></li>')
-                .append('<h1 style="width:150px; margin:2px;">'+ name+'</h1>')
-                .appendTo('#fancy_friend_list').click(function(){
-					//보태기 버튼 보이게 하기
-	               $('#friend_add_img_btn').css('display','block');
-				   $('#friend_detail_view').text('');
-	               
-	               var click = $(this).index('#fancy_friend_list li');
-				   selectedFriendName = friend_list_array[click].name;
-				   selectedFriendUid = friend_list_array[click].uid;
-				   selectedFriendImg = friend_list_array[click].pic_small;
-				   selectedFriendBirthday = friend_list_array[click].birthday;
-	               
-				   
-	               $('<img style="margin-left: 30px; width:35px; height:35px; float:left;"/>')
-	               .attr('src',friend_list_array[click].pic_small)
-	               .appendTo('#friend_detail_view');
-	
-	               $('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;" id="selected_friendlist_name" >'+friend_list_array[click].name+'</h1>')
-	               .append('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;">'+friend_list_array[click].birthday+'<h1>')
-	               .appendTo('#friend_detail_view');
-            });
-            setFriendListPageControl();
+               .append('<h1 style="width:190px; margin:2px;">'+ name+'</h1>')
+               .appendTo('#fancy_friend_list').click(function(){
+				//보태기 버튼 보이게 하기
+               $('#friend_add_img_btn').css('display','block');
+			   $('#friend_detail_view').text('');
+               
+               var click = $(this).index('#fancy_friend_list li');
+			   selectedFriendName = friend_list_array[click].name;
+			   selectedFriendUid = friend_list_array[click].uid;
+			   selectedFriendImg = friend_list_array[click].pic_small;
+			   selectedFriendBirthday = friend_list_array[click].birthday;
+               
+			   
+               $('<img style="margin-left: 30px; width:35px; height:35px; float:left;"/>')
+               .attr('src',friend_list_array[click].pic_small)
+               .appendTo('#friend_detail_view');
+
+               $('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;" id="selected_friendlist_name" >'+friend_list_array[click].name+'</h1>')
+               .append('<h1 style="float:left; font-size:12px; width:150px; margin-left: 20px;">'+friend_list_array[click].birthday+'<h1>')
+               .appendTo('#friend_detail_view');
+           	 });
+            
         };
         
         function setFriendListPageControl(tableWidth){
@@ -443,7 +461,7 @@
                     var namedata = ui.item.value;
                     $('#fancy_friend_list').text('');
                     $('<li style="cursor:pointer; font-size:8px; width:150px;" id="specific_friend_btn" ></li>')
-                    .append('<h1 style="width:150px; margin:2px;">'+ namedata +'</h1>')
+                    .append('<h1 style="width:190px; margin:2px;">'+ namedata +'</h1>')
                     .appendTo('#fancy_friend_list');  
                     
                     setSelectListner();
@@ -456,17 +474,7 @@
 		
         /*app 사용중인 내친구 가져오기*/
         var activeFriendList;
-		function getActiveUser(){
-            var data = "";
-            for(var i=0; i < friend_list.length; i++){
-                var uid = friend_list[i].uid;
-                if(i == friend_list.length-1){
-                    data += uid;
-                }
-                else{
-                    data += uid +",";   
-                }
-            }; 
+		function getActiveUser(data){ 
          
 		    $.ajax({
 				type : 'POST',

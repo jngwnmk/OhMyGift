@@ -24,17 +24,23 @@
             	}
                 
         });*/
-        
-        
-        var firstClick = true;
-        $("a#ForFriend_Btn").click(function(){
-            if(firstClick){
-                //$.fancybox.showActivity();
-                $('#fancybox-loading').css('top','35%'); 
-                firstClick = false;    
-            }
-               
+      	//친구에게 선물 하기 버튼
+        $("a#ForFriend_Btn").fancybox({
+                'titleShow'  : false,
+                'transitionIn'  : 'fade',
+                'transitionOut' : 'none',
+                'width' : '100%',
+                'height' : '100%',
+                'overlayShow'           : true,
+                'onClosed'		: function() {
+            	    $("#fancybox-outer").css('background','white');
+            	},
+                'onStart'		: function() {
+                    $("#fancybox-outer").css('width','440px');
+                    $('#fancybox-loading').css('top','35%');
+            	}
         });
+        
      
     });
     
